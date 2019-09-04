@@ -13,6 +13,20 @@ spec:
   selector:
     app: kafka
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-hs-ssl
+  labels:
+    app: kafka
+spec:
+  ports:
+  - port: 19093
+    name: server-ssl
+  clusterIP: None
+  selector:
+    app: kafka
+---
 apiVersion: policy/v1beta1
 kind: PodDisruptionBudget
 metadata:
@@ -38,6 +52,10 @@ spec:
       labels:
         app: kafka
     spec:
+      volumes:
+      - name: ssl-keystore
+        secret:
+          secretName: kafka-keystore
       affinity:
         podAntiAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -45,7 +63,7 @@ spec:
                 matchExpressions:
                   - key: "app"
                     operator: In
-                    values: 
+                    values:
                     - kafka
               topologyKey: "kubernetes.io/hostname"
         podAffinity:
@@ -69,13 +87,15 @@ spec:
             memory: "12Gi"
             cpu: 4
         ports:
-        - containerPort: 9093
-          name: server
+        - name: server
+          containerPort: 9093
+        - name: server-ssl
+          containerPort: 19093
         command:
         - sh
         - -c
         - "exec kafka-server-start.sh /opt/kafka/config/server.properties --override broker.id=${HOSTNAME##*-} \
-          --override listeners=PLAINTEXT://:9093 \
+          --override listeners=PLAINTEXT://:9093,SSL://:19093 \
           --override zookeeper.connect=zk-cs.default.svc.cluster.local:2181 \
           --override log.dir=/var/lib/kafka \
           --override auto.create.topics.enable=true \
@@ -160,7 +180,9 @@ spec:
           --override replica.fetch.backoff.ms=1000 \
           --override replica.fetch.max.bytes=1048576 \
           --override replica.fetch.response.max.bytes=10485760 \
-          --override reserved.broker.max.id=1000 "
+          --override reserved.broker.max.id=1000 \
+          --override ssl.keystore.location=/etc/khs/ssl/keystore \
+          --override ssl.keystore.password=changeit"
         env:
         - name: KAFKA_HEAP_OPTS
           value : "-Xmx2G -Xms2G"
@@ -169,6 +191,9 @@ spec:
         volumeMounts:
         - name: datadir
           mountPath: /var/lib/kafka
+        - name: ssl-keystore
+          mountPath: "/etc/khs/ssl"
+          readOnly: true
         readinessProbe:
           exec:
            command: 
