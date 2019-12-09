@@ -85,7 +85,7 @@ spec:
         image: gcr.io/google_containers/kubernetes-kafka:1.0-10.2.1
         resources:
           requests:
-            memory: "1Gi"
+            memory: "512Mi"
             cpu: "0.5"
         ports:
         - name: server
